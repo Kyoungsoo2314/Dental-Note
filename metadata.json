@@ -1,0 +1,9 @@
+
+{
+  "name": "Dental Voice Note AI",
+  "description": "An AI-powered tool to transcribe and summarize dental notes from voice input, streamlining the charting process. Speak into the microphone, and the AI will provide a concise summary for your patient records.",
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "prompt": ""
+}
