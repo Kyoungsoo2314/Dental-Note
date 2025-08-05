@@ -46,78 +46,28 @@
 
     <script>
         // --- PWA 설정: Service Worker와 Manifest ---
-        // 1. Manifest 파일 동적 생성
         const manifest = {
-            "name": "Dental Voice Note AI",
-            "short_name": "Dental AI",
-            "start_url": ".",
-            "display": "standalone",
-            "background_color": "#111827",
-            "theme_color": "#14b8a6",
-            "description": "치과 진료 음성 메모를 AI로 요약합니다.",
-            "icons": [{
-                "src": "https://placehold.co/192x192/14b8a6/ffffff?text=D-AI",
-                "sizes": "192x192",
-                "type": "image/png"
-            }, {
-                "src": "https://placehold.co/512x512/14b8a6/ffffff?text=D-AI",
-                "sizes": "512x512",
-                "type": "image/png"
-            }]
+            "name": "Dental Voice Note AI", "short_name": "Dental AI", "start_url": ".", "display": "standalone",
+            "background_color": "#111827", "theme_color": "#14b8a6", "description": "치과 진료 음성 메모를 AI로 요약합니다.",
+            "icons": [{"src": "https://placehold.co/192x192/14b8a6/ffffff?text=D-AI", "sizes": "192x192", "type": "image/png"}, {"src": "https://placehold.co/512x512/14b8a6/ffffff?text=D-AI", "sizes": "512x512", "type": "image/png"}]
         };
         const manifestBlob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
-        const manifestURL = URL.createObjectURL(manifestBlob);
-        document.getElementById('manifest-link').setAttribute('href', manifestURL);
+        document.getElementById('manifest-link').href = URL.createObjectURL(manifestBlob);
 
-        // 2. Service Worker 등록
         if ('serviceWorker' in navigator) {
             const swContent = `
                 const CACHE_NAME = 'dental-ai-cache-v1';
-                const urlsToCache = [
-                    '/',
-                    'https://cdn.tailwindcss.com',
-                    'https://unpkg.com/react@18/umd/react.development.js',
-                    'https://unpkg.com/react-dom@18/umd/react-dom.development.js',
-                    'https://unpkg.com/@babel/standalone/babel.min.js'
-                ];
-
-                self.addEventListener('install', event => {
-                    event.waitUntil(
-                        caches.open(CACHE_NAME)
-                            .then(cache => {
-                                console.log('Opened cache');
-                                return cache.addAll(urlsToCache);
-                            })
-                    );
-                });
-
-                self.addEventListener('fetch', event => {
-                    event.respondWith(
-                        caches.match(event.request)
-                            .then(response => {
-                                if (response) {
-                                    return response;
-                                }
-                                return fetch(event.request);
-                            })
-                    );
-                });
+                self.addEventListener('install', e => e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(['/', 'https://cdn.tailwindcss.com', 'https://unpkg.com/react@18/umd/react.development.js', 'https://unpkg.com/react-dom@18/umd/react-dom.development.js', 'https://unpkg.com/@babel/standalone/babel.min.js']))));
+                self.addEventListener('fetch', e => e.respondWith(caches.match(e.request).then(r => r || fetch(e.request))));
             `;
             const swBlob = new Blob([swContent], { type: 'application/javascript' });
-            const swURL = URL.createObjectURL(swBlob);
-
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register(swURL)
-                    .then(registration => console.log('ServiceWorker registration successful with scope: ', registration.scope))
-                    .catch(err => console.log('ServiceWorker registration failed: ', err));
-            });
+            window.addEventListener('load', () => navigator.serviceWorker.register(URL.createObjectURL(swBlob)));
         }
     </script>
 
     <script type="text/babel">
         const { useState, useEffect, useRef, Fragment } = React;
 
-        // --- Helper: SpeechRecognition Polyfill ---
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         const recognition = SpeechRecognition ? new SpeechRecognition() : null;
 
@@ -127,7 +77,6 @@
             recognition.interimResults = true;
         }
         
-        // --- AI System Instruction ---
         const SYSTEM_INSTRUCTION = `역할: 당신은 숙련된 치과 보조 AI입니다.
 임무: 치과 의사가 한국어로 말하는 원본 받아쓰기 내용을 간결하고 구조화된 전문적인 한국어 치과 차트 기록으로 변환해야 합니다.
 요약 형식: 요약은 두 부분으로 구성되어야 합니다.
@@ -135,59 +84,22 @@
 [메모]: 개인적인 메모. 환자와의 관계 형성에 도움이 될 수 있는 비임상적 정보(예: 취미, 가족 소식, 휴가나 결혼 같은 예정된 생활 이벤트)를 기록합니다.
 규칙: 요약은 짧고 핵심만 담아야 합니다. 개인적인 메모 내용이 없으면 [메모] 섹션은 생략하세요.`;
 
+        const MicIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line></svg>;
+        const StopIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"></rect></svg>;
+        const AiIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-teal-500"><path d="m12 8-2 4 2 4 2-4-2-4z"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.9 4.9 1.4 1.4"/><path d="m17.7 17.7 1.4 1.4"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m4.9 19.1 1.4-1.4"/><path d="m17.7 6.3 1.4-1.4"/></svg>;
+        const CopyIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>;
+        const CheckIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="text-green-500"><polyline points="20 6 9 17 4 12"></polyline></svg>;
 
-        // --- SVG Icons ---
-        const MicIcon = () => (
-            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line></svg>
-        );
-
-        const StopIcon = () => (
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"></rect></svg>
-        );
-
-        const AiIcon = () => (
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-teal-500"><path d="m12 8-2 4 2 4 2-4-2-4z"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.9 4.9 1.4 1.4"/><path d="m17.7 17.7 1.4 1.4"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m4.9 19.1 1.4-1.4"/><path d="m17.7 6.3 1.4-1.4"/></svg>
-        );
-
-        const CopyIcon = () => (
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-        );
-
-        const CheckIcon = () => (
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="text-green-500"><polyline points="20 6 9 17 4 12"></polyline></svg>
-        );
-
-        // --- Components ---
-        const ApiKeyModal = ({ onSave }) => {
+        const ApiKeyModal = ({ onSave, initialError }) => {
             const [key, setKey] = useState('');
-
-            const handleSave = () => {
-                if (key.trim()) {
-                    onSave(key.trim());
-                }
-            };
-
             return (
                 <div className="fixed inset-0 bg-gray-900 bg-opacity-80 flex items-center justify-center z-50">
-                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-8 w-full max-w-md">
-                        <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">Gemini API 키 필요</h2>
-                        <p className="text-gray-600 dark:text-gray-300 mb-6">
-                            AI 요약 기능을 사용하려면 Google AI Studio에서 발급받은 Gemini API 키를 입력해주세요.
-                        </p>
-                        <input
-                            type="password"
-                            value={key}
-                            onChange={(e) => setKey(e.target.value)}
-                            placeholder="API 키를 여기에 붙여넣으세요"
-                            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none"
-                        />
-                        <button
-                            onClick={handleSave}
-                            className="w-full mt-6 bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 px-4 rounded-md transition-colors duration-200 disabled:bg-gray-400"
-                            disabled={!key.trim()}
-                        >
-                            저장하고 시작하기
-                        </button>
+                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-8 w-full max-w-md mx-4">
+                        <h2 className="text-2xl font-bold mb-2 text-gray-900 dark:text-white">Gemini API 키 필요</h2>
+                        <p className="text-gray-600 dark:text-gray-300 mb-4">AI 요약 기능을 사용하려면 Gemini API 키를 입력해주세요.</p>
+                        {initialError && <p className="text-red-500 text-sm mb-4">{initialError}</p>}
+                        <input type="password" value={key} onChange={(e) => setKey(e.target.value)} placeholder="API 키를 여기에 붙여넣으세요" className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none" />
+                        <button onClick={() => key.trim() && onSave(key.trim())} className="w-full mt-6 bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 px-4 rounded-md transition-colors duration-200 disabled:bg-gray-400" disabled={!key.trim()}>저장하고 시작하기</button>
                     </div>
                 </div>
             );
@@ -195,73 +107,43 @@
 
         const MessageBubble = ({ message }) => {
             const [copied, setCopied] = useState(false);
-
             const handleCopy = () => {
-                const textToCopy = typeof message.content === 'string' ? message.content : message.content.join('\n');
-                
-                const textArea = document.createElement("textarea");
-                textArea.value = textToCopy;
-                document.body.appendChild(textArea);
-                textArea.select();
-                try {
-                    document.execCommand('copy');
+                const textToCopy = Array.isArray(message.content) ? message.content.join('\n') : message.content;
+                navigator.clipboard.writeText(textToCopy).then(() => {
                     setCopied(true);
                     setTimeout(() => setCopied(false), 2000);
-                } catch (err) {
-                    console.error('Failed to copy text: ', err);
-                }
-                document.body.removeChild(textArea);
+                }).catch(err => console.error('Failed to copy text: ', err));
             };
 
             if (message.type === 'loading') {
-                return (
-                    <div className="flex justify-start items-end gap-2.5">
-                        <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center flex-shrink-0"><AiIcon /></div>
-                        <div className="flex items-center space-x-1 p-4 bg-white dark:bg-gray-800 rounded-e-xl rounded-es-xl">
-                            <div className="w-2.5 h-2.5 bg-gray-400 rounded-full animate-pulse delay-0"></div>
-                            <div className="w-2.5 h-2.5 bg-gray-400 rounded-full animate-pulse delay-200"></div>
-                            <div className="w-2.5 h-2.5 bg-gray-400 rounded-full animate-pulse delay-400"></div>
-                        </div>
-                    </div>
-                );
+                return <div className="flex justify-start items-end gap-2.5"><div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center flex-shrink-0"><AiIcon /></div><div className="flex items-center space-x-1 p-4 bg-white dark:bg-gray-800 rounded-e-xl rounded-es-xl"><div className="w-2.5 h-2.5 bg-gray-400 rounded-full animate-pulse delay-0"></div><div className="w-2.5 h-2.5 bg-gray-400 rounded-full animate-pulse delay-200"></div><div className="w-2.5 h-2.5 bg-gray-400 rounded-full animate-pulse delay-400"></div></div></div>;
             }
-
             const isUser = message.type === 'user';
-            const bubbleClasses = isUser
-                ? 'bg-blue-600 text-white rounded-s-xl rounded-ee-xl'
-                : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-e-xl rounded-es-xl';
-            const containerClasses = `flex items-end gap-2.5 group ${isUser ? 'justify-end' : 'justify-start'}`;
-
-            const content = Array.isArray(message.content) 
-                ? message.content.map((line, index) => <p key={index}>{line}</p>)
-                : <p>{message.content}</p>;
+            const bubbleClasses = isUser ? 'bg-blue-600 text-white rounded-s-xl rounded-ee-xl' : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-e-xl rounded-es-xl';
+            const content = Array.isArray(message.content) ? message.content.map((line, i) => <p key={i}>{line}</p>) : <p>{message.content}</p>;
 
             return (
-                <div className={containerClasses}>
-                    {!isUser && (
-                        <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center flex-shrink-0"><AiIcon /></div>
-                    )}
-                    <div className={`relative flex flex-col w-full max-w-xl leading-1.5 p-4 border-gray-200 dark:border-gray-700 ${bubbleClasses}`}>
+                <div className={`flex items-end gap-2.5 group ${isUser ? 'justify-end' : 'justify-start'}`}>
+                    {!isUser && <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center flex-shrink-0"><AiIcon /></div>}
+                    <div className={`relative flex flex-col w-full max-w-xl leading-1.5 p-4 ${bubbleClasses}`}>
                         <div className="text-base font-normal whitespace-pre-wrap">{content}</div>
-                        <button onClick={handleCopy} className="absolute top-1 right-1 p-1 rounded-full bg-black/10 dark:bg-white/10 text-white dark:text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity">
-                            {copied ? <CheckIcon /> : <CopyIcon />}
-                        </button>
+                        <button onClick={handleCopy} className="absolute top-1 right-1 p-1 rounded-full bg-black/10 dark:bg-white/10 text-white dark:text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity">{copied ? <CheckIcon /> : <CopyIcon />}</button>
                     </div>
                 </div>
             );
         };
 
-        // --- Main App Component ---
         const App = () => {
             const [apiKey, setApiKey] = useState(null);
             const [isApiKeySet, setIsApiKeySet] = useState(false);
+            const [apiKeyError, setApiKeyError] = useState('');
             const [messages, setMessages] = useState([]);
             const [isRecording, setIsRecording] = useState(false);
             const [error, setError] = useState('');
-            const finalTranscriptRef = useRef('');
+            const fullTranscriptRef = useRef('');
+            const userStoppedRef = useRef(false);
             const messagesEndRef = useRef(null);
 
-            // Check for API key on mount
             useEffect(() => {
                 const storedKey = localStorage.getItem('gemini_api_key');
                 if (storedKey) {
@@ -270,12 +152,10 @@
                 }
             }, []);
 
-            // Scroll to bottom when messages change
             useEffect(() => {
                 messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
             }, [messages]);
 
-            // Setup speech recognition
             useEffect(() => {
                 if (!recognition) {
                     setError('이 브라우저는 음성 인식을 지원하지 않습니다.');
@@ -285,24 +165,22 @@
                 recognition.onstart = () => {
                     setIsRecording(true);
                     setError('');
-                    finalTranscriptRef.current = '';
                 };
 
                 recognition.onend = () => {
                     setIsRecording(false);
-                    if (finalTranscriptRef.current.trim()) {
-                        setMessages(prev => [...prev, { type: 'user', content: finalTranscriptRef.current.trim() }]);
-                        getAiSummary(finalTranscriptRef.current.trim());
+                    // 사용자가 직접 중지하지 않았고, 에러도 없는 경우(예: 잠시 멈춤) 자동 재시작
+                    if (!userStoppedRef.current && !error) {
+                       // 약간의 딜레이 후 재시작하여 모바일 브라우저의 연속 호출 오류 방지
+                       setTimeout(() => {
+                         if (!userStoppedRef.current) recognition.start();
+                       }, 250);
                     }
                 };
 
                 recognition.onerror = (event) => {
-                    if (event.error === 'no-speech' || event.error === 'audio-capture') {
-                        setError('음성이 감지되지 않았거나 마이크에 문제가 있습니다.');
-                    } else if (event.error === 'not-allowed') {
-                        setError('마이크 사용 권한이 거부되었습니다.');
-                    } else {
-                        setError(`오류 발생: ${event.error}`);
+                    if (event.error !== 'no-speech') {
+                         setError(event.error === 'not-allowed' ? '마이크 사용 권한이 거부되었습니다.' : `오류: ${event.error}`);
                     }
                     setIsRecording(false);
                 };
@@ -311,7 +189,8 @@
                     let interim_transcript = '';
                     let final_transcript = '';
 
-                    for (let i = event.resultIndex; i < event.results.length; ++i) {
+                    // 전체 결과를 순회하며 최종본과 임시본을 재구성 (중복 방지)
+                    for (let i = 0; i < event.results.length; ++i) {
                         if (event.results[i].isFinal) {
                             final_transcript += event.results[i][0].transcript;
                         } else {
@@ -319,89 +198,74 @@
                         }
                     }
                     
-                    if (final_transcript) {
-                        finalTranscriptRef.current += final_transcript + ' ';
-                    }
-
-                    // Display live transcript for user feedback
-                    const liveTranscript = finalTranscriptRef.current + interim_transcript;
-                    if (messages[messages.length - 1]?.type === 'live') {
-                        setMessages(prev => [...prev.slice(0, -1), { type: 'live', content: liveTranscript }]);
-                    } else if (liveTranscript) {
-                        setMessages(prev => [...prev, { type: 'live', content: liveTranscript }]);
-                    }
+                    fullTranscriptRef.current = final_transcript;
+                    const liveTranscript = final_transcript + interim_transcript;
+                    
+                    // 실시간 타이핑 화면 업데이트
+                    setMessages(prev => {
+                        const lastMessage = prev[prev.length - 1];
+                        if (lastMessage?.type === 'live') {
+                            return [...prev.slice(0, -1), { type: 'live', content: liveTranscript }];
+                        }
+                        return [...prev, { type: 'live', content: liveTranscript }];
+                    });
                 };
-
-            }, [messages]);
+            }, [error]);
 
             const handleRecordToggle = () => {
-                if (!isApiKeySet) {
-                    setError("시작하기 전에 API 키를 먼저 설정해주세요.");
-                    return;
-                }
+                if (!isApiKeySet) return;
                 if (isRecording) {
-                    // Remove live transcript before stopping
-                    if (messages[messages.length - 1]?.type === 'live') {
-                        setMessages(prev => prev.slice(0, -1));
-                    }
+                    userStoppedRef.current = true; // 사용자가 직접 중지했음을 표시
                     recognition.stop();
-                } else {
-                    try {
-                        recognition.start();
-                    } catch (e) {
-                         // This can happen if recognition is already starting
-                        console.warn("Recognition start error:", e.message);
+                    
+                    setMessages(prev => prev.filter(m => m.type !== 'live')); // 실시간 표시 제거
+
+                    if (fullTranscriptRef.current.trim()) {
+                        const finalTranscript = fullTranscriptRef.current.trim();
+                        setMessages(prev => [...prev, { type: 'user', content: finalTranscript }]);
+                        getAiSummary(finalTranscript);
                     }
+                    fullTranscriptRef.current = '';
+                } else {
+                    userStoppedRef.current = false; // 녹음 시작 시 플래그 초기화
+                    recognition.start();
                 }
             };
 
             const getAiSummary = async (text) => {
-                if (!apiKey) {
-                    setError("API 키가 설정되지 않았습니다.");
-                    return;
-                }
-                
                 setMessages(prev => [...prev, { type: 'loading' }]);
                 setError('');
 
                 const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
-
                 const payload = {
-                    contents: [
-                        { role: "user", parts: [{ text: `${SYSTEM_INSTRUCTION}\n\n받아쓰기 내용:\n"${text}"` }] }
-                    ],
-                    generationConfig: {
-                        temperature: 0.3,
-                        topP: 0.9,
-                    }
+                    contents: [{ role: "user", parts: [{ text: `${SYSTEM_INSTRUCTION}\n\n받아쓰기 내용:\n"${text}"` }] }],
+                    generationConfig: { temperature: 0.3, topP: 0.9 }
                 };
 
                 try {
-                    const response = await fetch(API_URL, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
+                    const response = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                    const data = await response.json();
 
                     if (!response.ok) {
-                        const errorData = await response.json();
-                        throw new Error(errorData.error?.message || `HTTP 에러: ${response.status}`);
+                        const errorMessage = data.error?.message || `HTTP 에러: ${response.status}`;
+                        // API 키 유효성 검사 오류 처리
+                        if (errorMessage.includes('API key not valid')) {
+                            localStorage.removeItem('gemini_api_key');
+                            setApiKey(null);
+                            setIsApiKeySet(false);
+                            setApiKeyError('API 키가 유효하지 않습니다. 확인 후 다시 입력해주세요.');
+                        }
+                        throw new Error(errorMessage);
                     }
-
-                    const data = await response.json();
                     
-                    if (!data.candidates || !data.candidates[0].content.parts[0].text) {
-                        throw new Error("AI로부터 유효한 응답을 받지 못했습니다.");
-                    }
-                    
-                    const summary = data.candidates[0].content.parts[0].text;
-                    const formattedSummary = summary.split('\n').filter(line => line.trim() !== '');
+                    const summary = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                    if (!summary) throw new Error("AI로부터 유효한 응답을 받지 못했습니다.");
 
-                    setMessages(prev => [...prev.slice(0, -1), { type: 'ai', content: formattedSummary }]);
+                    setMessages(prev => [...prev.slice(0, -1), { type: 'ai', content: summary.split('\n').filter(Boolean) }]);
                 } catch (e) {
                     console.error("AI 요약 API 호출 실패:", e);
                     setError(`AI 요약 생성 실패: ${e.message}`);
-                    setMessages(prev => prev.slice(0, -1)); // Remove loading indicator
+                    setMessages(prev => prev.filter(m => m.type !== 'loading'));
                 }
             };
             
@@ -409,7 +273,7 @@
                 setApiKey(key);
                 localStorage.setItem('gemini_api_key', key);
                 setIsApiKeySet(true);
-                setError('');
+                setApiKeyError('');
             };
 
             const visibleMessages = messages.filter(m => m.type !== 'live');
@@ -417,15 +281,13 @@
 
             return (
                 <Fragment>
-                    {!isApiKeySet && <ApiKeyModal onSave={handleApiKeySave} />}
+                    {!isApiKeySet && <ApiKeyModal onSave={handleApiKeySave} initialError={apiKeyError} />}
                     <div className="flex flex-col h-screen max-w-4xl mx-auto">
-                        {/* Header */}
-                        <header className="p-4 border-b border-gray-200 dark:border-gray-700 text-center">
+                        <header className="p-4 border-b border-gray-200 dark:border-gray-700 text-center flex-shrink-0">
                             <h1 className="text-2xl font-bold text-gray-800 dark:text-white">Dental Voice Note AI</h1>
                             <p className="text-sm text-gray-500 dark:text-gray-400">실시간 받아쓰기 및 진료 차트 요약</p>
                         </header>
 
-                        {/* Main Content */}
                         <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
                             {visibleMessages.length === 0 && !liveTranscriptMessage && (
                                 <div className="flex flex-col items-center justify-center h-full text-center text-gray-500 dark:text-gray-400">
@@ -436,7 +298,7 @@
                             {visibleMessages.map((msg, index) => <MessageBubble key={index} message={msg} />)}
                             {liveTranscriptMessage && (
                                 <div className="flex justify-end">
-                                    <div className="bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 p-4 rounded-lg italic">
+                                    <div className="bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 p-4 rounded-lg italic w-full max-w-xl">
                                         {liveTranscriptMessage.content}
                                     </div>
                                 </div>
@@ -444,20 +306,10 @@
                             <div ref={messagesEndRef} />
                         </main>
 
-                        {/* Footer */}
-                        <footer className="p-4 border-t border-gray-200 dark:border-gray-700">
+                        <footer className="p-4 border-t border-gray-200 dark:border-gray-700 flex-shrink-0">
                             {error && <p className="text-center text-red-500 text-sm mb-3">{error}</p>}
                             <div className="flex items-center justify-center">
-                                <button
-                                    onClick={handleRecordToggle}
-                                    disabled={!recognition || !isApiKeySet}
-                                    className={`w-16 h-16 rounded-full flex items-center justify-center text-white transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-opacity-50
-                                        ${isRecording 
-                                            ? 'bg-red-500 hover:bg-red-600 focus:ring-red-400 recording-animation' 
-                                            : 'bg-teal-500 hover:bg-teal-600 focus:ring-teal-400'}
-                                        ${(!recognition || !isApiKeySet) ? 'bg-gray-400 cursor-not-allowed' : ''}
-                                    `}
-                                >
+                                <button onClick={handleRecordToggle} disabled={!recognition || !isApiKeySet} className={`w-16 h-16 rounded-full flex items-center justify-center text-white transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-opacity-50 ${isRecording ? 'bg-red-500 hover:bg-red-600 focus:ring-red-400 recording-animation' : 'bg-teal-500 hover:bg-teal-600 focus:ring-teal-400'} ${!isApiKeySet ? 'bg-gray-400 cursor-not-allowed' : ''}`}>
                                     {isRecording ? <StopIcon /> : <MicIcon />}
                                 </button>
                             </div>
