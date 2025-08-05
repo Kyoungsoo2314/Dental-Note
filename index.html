@@ -141,7 +141,7 @@
             const [isRecording, setIsRecording] = useState(false);
             const [error, setError] = useState('');
             const fullTranscriptRef = useRef('');
-            const userStoppedRef = useRef(false);
+            const interimTranscriptRef = useRef('');
             const messagesEndRef = useRef(null);
 
             useEffect(() => {
@@ -169,13 +169,8 @@
 
                 recognition.onend = () => {
                     setIsRecording(false);
-                    // 사용자가 직접 중지하지 않았고, 에러도 없는 경우(예: 잠시 멈춤) 자동 재시작
-                    if (!userStoppedRef.current && !error) {
-                       // 약간의 딜레이 후 재시작하여 모바일 브라우저의 연속 호출 오류 방지
-                       setTimeout(() => {
-                         if (!userStoppedRef.current) recognition.start();
-                       }, 250);
-                    }
+                    // 모바일 환경의 반복적인 권한 요청 및 불안정성 문제를 해결하기 위해 자동 재시작 로직을 제거합니다.
+                    // 긴 침묵 후 녹음이 중단되면 사용자가 직접 다시 마이크 버튼을 눌러야 합니다.
                 };
 
                 recognition.onerror = (event) => {
@@ -187,19 +182,20 @@
 
                 recognition.onresult = (event) => {
                     let interim_transcript = '';
-                    let final_transcript = '';
-
-                    // 전체 결과를 순회하며 최종본과 임시본을 재구성 (중복 방지)
-                    for (let i = 0; i < event.results.length; ++i) {
+                    // 새로 도착한 결과만 처리하여 중복을 방지합니다.
+                    for (let i = event.resultIndex; i < event.results.length; ++i) {
+                        const transcript = event.results[i][0].transcript;
                         if (event.results[i].isFinal) {
-                            final_transcript += event.results[i][0].transcript;
+                            // 최종 확정된 결과는 전체 텍스트에 추가합니다.
+                            fullTranscriptRef.current += transcript + ' ';
                         } else {
-                            interim_transcript += event.results[i][0].transcript;
+                            // 아직 확정되지 않은 중간 결과입니다.
+                            interim_transcript += transcript;
                         }
                     }
                     
-                    fullTranscriptRef.current = final_transcript;
-                    const liveTranscript = final_transcript + interim_transcript;
+                    interimTranscriptRef.current = interim_transcript;
+                    const liveTranscript = fullTranscriptRef.current + interimTranscriptRef.current;
                     
                     // 실시간 타이핑 화면 업데이트
                     setMessages(prev => {
@@ -210,24 +206,26 @@
                         return [...prev, { type: 'live', content: liveTranscript }];
                     });
                 };
-            }, [error]);
+            }, []);
 
             const handleRecordToggle = () => {
                 if (!isApiKeySet) return;
                 if (isRecording) {
-                    userStoppedRef.current = true; // 사용자가 직접 중지했음을 표시
                     recognition.stop();
                     
-                    setMessages(prev => prev.filter(m => m.type !== 'live')); // 실시간 표시 제거
+                    setMessages(prev => prev.filter(m => m.type !== 'live'));
 
-                    if (fullTranscriptRef.current.trim()) {
-                        const finalTranscript = fullTranscriptRef.current.trim();
+                    const finalTranscript = fullTranscriptRef.current.trim();
+                    if (finalTranscript) {
                         setMessages(prev => [...prev, { type: 'user', content: finalTranscript }]);
                         getAiSummary(finalTranscript);
                     }
                     fullTranscriptRef.current = '';
+                    interimTranscriptRef.current = '';
                 } else {
-                    userStoppedRef.current = false; // 녹음 시작 시 플래그 초기화
+                    // 녹음 시작 전, 이전 기록 초기화
+                    fullTranscriptRef.current = '';
+                    interimTranscriptRef.current = '';
                     recognition.start();
                 }
             };
@@ -248,7 +246,6 @@
 
                     if (!response.ok) {
                         const errorMessage = data.error?.message || `HTTP 에러: ${response.status}`;
-                        // API 키 유효성 검사 오류 처리
                         if (errorMessage.includes('API key not valid')) {
                             localStorage.removeItem('gemini_api_key');
                             setApiKey(null);
